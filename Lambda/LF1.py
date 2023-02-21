@@ -4,6 +4,7 @@ import datetime
 import time
 import os
 import logging
+import boto3
 
 
 logger = logging.getLogger()
@@ -199,10 +200,22 @@ def dining_suggestions_intent(intent_request):
                'content': 'You’re all set. Expect my suggestions to {} shortly!'.format(phone_number)}]
     fulfilled_intent = intent_request['sessionState']['intent']
     fulfilled_intent['state'] = 'Fulfilled'
+    messages = [{'contentType': 'PlainText',
+               'content': 'You’re all set. Expect my suggestions to {} shortly!'.format(phone_number)}]
     return close(session_attributes, fulfilled_intent, messages)
 
 
+def thank_you_intent(intent_request):
+    session_attributes = get_session_attributes(intent_request)
+    fulfilled_intent = intent_request['sessionState']['intent']
+    fulfilled_intent['state'] = 'Fulfilled'
+    messages = [{'contentType': 'PlainText',
+                'content': 'You’re welcome!'}]
+    return close(session_attributes, fulfilled_intent, messages)
+
 """ --- Intents --- """
+
+
 
 
 def dispatch(intent_request):
@@ -213,6 +226,8 @@ def dispatch(intent_request):
         return greeting_intent(intent_request)
     elif intent_name == 'DiningSuggestionsIntent':
         return dining_suggestions_intent(intent_request)
+    elif intent_name == 'ThankYouIntent':
+        return thank_you_intent(intent_request)
 
     raise Exception('Intent with name ' + intent_name + ' not supported')
 
