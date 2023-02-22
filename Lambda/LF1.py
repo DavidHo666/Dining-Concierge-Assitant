@@ -160,6 +160,45 @@ def validate_dining_suggestions(location, cuisine, party_size, date, time, phone
     return build_validation_result(True, None, None)
 
 
+# ref: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/sqs-example-sending-receiving-msgs.html
+def push_SQS(location, cuisine, party_size, date, time, phone_number):
+    sqs = boto3.client('sqs', region_name = 'us-east-1',
+                       aws_access_key_id = os.getenv('KEY_ID'),
+                       aws_secret_access_key = os.getenv('SECRET_KEY'))
+    url = os.getenv('QUEUE_URL')
+    message_attributes = {
+            'location': {
+                'DataType': 'String',
+                'StringValue': location
+            },
+            'cuisine': {
+                'DataType': 'String',
+                'StringValue': cuisine
+            },
+            'party_size': {
+                'DataType': 'String',
+                'StringValue': party_size
+            },
+            'date': {
+                'DataType': 'String',
+                'StringValue': date
+            },
+            'time': {
+                'DataType': 'String',
+                'StringValue': time
+            },
+            'phone_number': {
+                'DataType': 'String',
+                'StringValue': phone_number
+            }
+        }
+    message_body = 'slots from the user'
+    response = sqs.send_message(QueueUrl=url, MessageAttributes=message_attributes, MessageBody = message_body)
+    print(response)
+    logger.debug(response)
+
+
+
 """ --- Functions that control the bot's behavior --- """
 
 def greeting_intent(intent_request):
@@ -169,6 +208,8 @@ def greeting_intent(intent_request):
             'content': "Hi! How Can I Help you?"
         }
     return elicit_intent(session_attributes, message)
+
+
 
 
 def dining_suggestions_intent(intent_request):
@@ -196,8 +237,8 @@ def dining_suggestions_intent(intent_request):
 
         return delegate(session_attributes, get_slots(intent_request))
 
-    messages = [{'contentType': 'PlainText',
-               'content': 'You’re all set. Expect my suggestions to {} shortly!'.format(phone_number)}]
+    push_SQS(location, cuisine, party_size, date, time, phone_number)
+
     fulfilled_intent = intent_request['sessionState']['intent']
     fulfilled_intent['state'] = 'Fulfilled'
     messages = [{'contentType': 'PlainText',
@@ -242,8 +283,3 @@ def lambda_handler(event, context):
     return dispatch(event)
 
 
-if __name__ == "__main__":
-    event = {'sessionId': '267524565890316', 'inputTranscript': 'tomorrow', 'interpretations': [{'intent': {'slots': {'date': {'shape': 'Scalar', 'value': {'originalValue': 'tomorrow', 'resolvedValues': ['2023-02-22'], 'interpretedValue': '2023-02-22'}}, 'cuisine': {'shape': 'Scalar', 'value': {'originalValue': 'japanese', 'resolvedValues': ['Japanese'], 'interpretedValue': 'japanese'}}, 'party_size': {'shape': 'Scalar', 'value': {'originalValue': '12', 'resolvedValues': [], 'interpretedValue': '12'}}, 'location': {'shape': 'Scalar', 'value': {'originalValue': 'manhattan', 'resolvedValues': ['Manhattan'], 'interpretedValue': 'manhattan'}}, 'phone_number': None, 'time': None}, 'confirmationState': 'None', 'name': 'DiningSuggestionsIntent', 'state': 'InProgress'}, 'nluConfidence': 1.0}, {'intent': {'slots': {}, 'confirmationState': 'None', 'name': 'FallbackIntent', 'state': 'InProgress'}}, {'intent': {'slots': {}, 'confirmationState': 'None', 'name': 'GreetingIntent', 'state': 'InProgress'}, 'nluConfidence': 0.44}], 'proposedNextState': {'intent': {'slots': {'date': {'shape': 'Scalar', 'value': {'originalValue': 'tomorrow', 'resolvedValues': ['2023-02-22'], 'interpretedValue': '2023-02-22'}}, 'cuisine': {'shape': 'Scalar', 'value': {'originalValue': 'japanese', 'resolvedValues': ['Japanese'], 'interpretedValue': 'japanese'}}, 'party_size': {'shape': 'Scalar', 'value': {'originalValue': '12', 'resolvedValues': [], 'interpretedValue': '12'}}, 'location': {'shape': 'Scalar', 'value': {'originalValue': 'manhattan', 'resolvedValues': ['Manhattan'], 'interpretedValue': 'manhattan'}}, 'phone_number': None, 'time': None}, 'confirmationState': 'None', 'name': 'DiningSuggestionsIntent', 'state': 'InProgress'}, 'dialogAction': {'slotToElicit': 'time', 'type': 'ElicitSlot'}, 'prompt': {'attempt': 'Initial'}}, 'sessionState': {'sessionAttributes': {}, 'activeContexts': [], 'intent': {'slots': {'date': {'shape': 'Scalar', 'value': {'originalValue': 'tomorrow', 'resolvedValues': ['2023-02-22'], 'interpretedValue': '2023-02-22'}}, 'cuisine': {'shape': 'Scalar', 'value': {'originalValue': 'japanese', 'resolvedValues': ['Japanese'], 'interpretedValue': 'japanese'}}, 'party_size': {'shape': 'Scalar', 'value': {'originalValue': '12', 'resolvedValues': [], 'interpretedValue': '12'}}, 'location': {'shape': 'Scalar', 'value': {'originalValue': 'manhattan', 'resolvedValues': ['Manhattan'], 'interpretedValue': 'manhattan'}}, 'phone_number': None, 'time': None}, 'confirmationState': 'None', 'name': 'DiningSuggestionsIntent', 'state': 'InProgress'}, 'originatingRequestId': '76c8b664-ec1e-4c52-9b75-e404314abfb9'}, 'responseContentType': 'text/plain; charset=utf-8', 'invocationSource': 'DialogCodeHook', 'messageVersion': '1.0', 'transcriptions': [{'transcription': 'tomorrow', 'resolvedSlots': {'date': {'shape': 'Scalar', 'value': {'originalValue': 'tomorrow', 'resolvedValues': ['2023-02-22']}}}, 'transcriptionConfidence': 1.0, 'resolvedContext': {'intent': 'DiningSuggestionsIntent'}}], 'inputMode': 'Text', 'bot': {'aliasId': 'TSTALIASID', 'aliasName': 'TestBotAlias', 'name': 'DiningConcierge', 'version': 'DRAFT', 'localeId': 'en_US', 'id': 'XYWRSPCNFB'}}
-
-    response = lambda_handler(event, None)
-    tmp = 1
