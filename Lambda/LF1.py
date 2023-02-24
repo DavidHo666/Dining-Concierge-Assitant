@@ -5,6 +5,7 @@ import time
 import os
 import logging
 import boto3
+import re
 
 
 logger = logging.getLogger()
@@ -118,7 +119,7 @@ def isvalid_date(date):
     except ValueError:
         return False
 
-def validate_dining_suggestions(location, cuisine, party_size, date, time, phone_number):
+def validate_dining_suggestions(location, cuisine, party_size, date, time, email):
     location_types = ['manhattan', 'nyc']
     if location and location.lower() not in location_types:
         return build_validation_result(False,
@@ -153,15 +154,16 @@ def validate_dining_suggestions(location, cuisine, party_size, date, time, phone
         if len(time) != 5:
             return build_validation_result(False, 'time', None)
 
-    if phone_number:
-        if len(phone_number) != 10:
-            return build_validation_result(False, 'phone_number', 'The phone number is invalid, please try again.')
+    if email:
+        regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+        if not (re.fullmatch(regex, email)):
+            return build_validation_result(False, 'email', 'The email is invalid, please try again.')
 
     return build_validation_result(True, None, None)
 
 
 # ref: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/sqs-example-sending-receiving-msgs.html
-def push_SQS(location, cuisine, party_size, date, time, phone_number):
+def push_SQS(location, cuisine, party_size, date, time, email):
     sqs = boto3.client('sqs', region_name = 'us-east-1',
                        aws_access_key_id = os.getenv('KEY_ID'),
                        aws_secret_access_key = os.getenv('SECRET_KEY'))
@@ -187,9 +189,9 @@ def push_SQS(location, cuisine, party_size, date, time, phone_number):
                 'DataType': 'String',
                 'StringValue': time
             },
-            'phone_number': {
+            'email': {
                 'DataType': 'String',
-                'StringValue': phone_number
+                'StringValue': email
             }
         }
     message_body = 'slots from the user'
@@ -218,14 +220,14 @@ def dining_suggestions_intent(intent_request):
     party_size = get_slot(intent_request, 'party_size',)
     date = get_slot(intent_request, 'date')
     time = get_slot(intent_request, 'time')
-    phone_number = get_slot(intent_request, 'phone_number')
+    email = get_slot(intent_request, 'email')
     source = intent_request['invocationSource']
     session_attributes = get_session_attributes(intent_request)
 
     if source == 'DialogCodeHook':
         slots = get_slots(intent_request)
         validation_result = validate_dining_suggestions(location, cuisine, party_size,
-                                                        date, time, phone_number)
+                                                        date, time, email)
         if not validation_result['isValid']:
             slots[validation_result['violatedSlot']] = None
 
@@ -237,12 +239,12 @@ def dining_suggestions_intent(intent_request):
 
         return delegate(session_attributes, get_slots(intent_request))
 
-    push_SQS(location, cuisine, party_size, date, time, phone_number)
+    push_SQS(location, cuisine, party_size, date, time, email)
 
     fulfilled_intent = intent_request['sessionState']['intent']
     fulfilled_intent['state'] = 'Fulfilled'
     messages = [{'contentType': 'PlainText',
-               'content': 'You’re all set. Expect my suggestions to {} shortly!'.format(phone_number)}]
+               'content': 'You’re all set. Expect my suggestions to {} shortly!'.format(email)}]
     return close(session_attributes, fulfilled_intent, messages)
 
 
