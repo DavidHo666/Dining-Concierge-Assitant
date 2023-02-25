@@ -13,16 +13,26 @@ logger.setLevel(logging.DEBUG)
 
 REGION = 'us-east-1'
 
-sqs = boto3.client('sqs', region_name = REGION)
-dynamodb = boto3.resource('dynamodb', region_name=REGION)
+sqs = boto3.client('sqs', region_name = REGION,
+                       aws_access_key_id = os.getenv('KEY_ID'),
+                       aws_secret_access_key = os.getenv('SECRET_KEY'))
+
+
+session = boto3.Session(region_name='us-east-1',
+                        aws_access_key_id=os.getenv('KEY_ID'),
+                        aws_secret_access_key=os.getenv('SECRET_KEY'))
+dynamodb = session.resource('dynamodb')
 table = dynamodb.Table('yelp-restaurants')
-ses = boto3.client("ses", region_name=REGION)
+
+ses = boto3.client("ses", region_name=REGION,
+                   aws_access_key_id=os.getenv('KEY_ID'),
+                   aws_secret_access_key=os.getenv('SECRET_KEY'))
 
 
 # ref: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/sqs-example-sending-receiving-msgs.html
 def receive_sqs_message():
     response = sqs.receive_message(
-        QueueUrl=os.getenv('SQS_URL'),
+        QueueUrl=os.getenv('QUEUE_URL'),
         AttributeNames=['All'],
         MessageAttributeNames=[
             'cuisine', 'date', 'location', 'party_size', 'email', 'time'
@@ -35,7 +45,7 @@ def receive_sqs_message():
 
 def delete_sqs_message(receipt_handle):
     sqs.delete_message(
-        QueueUrl=os.getenv('SQS_URL'),
+        QueueUrl=os.getenv('QUEUE_URL'),
         ReceiptHandle=receipt_handle
     )
 
