@@ -130,7 +130,7 @@ def build_message(all_details, cuisine, party_size, date, time, location):
     message += '\n'
     message += f"We have {len(all_details)} restaurant suggestions for you: \n"
     for i, res in enumerate(all_details):
-        message += f"({i}) {res['name']}: {' '.join(res['location'])}\n"
+        message += f"({i+1}) {res['name']}: {' '.join(res['location'])}\n"
     return message
 
 
