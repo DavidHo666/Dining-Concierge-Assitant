@@ -7,8 +7,8 @@ import os
 import boto3
 
 session = boto3.Session(region_name='us-east-1',
-                        aws_access_key_id=os.getenv('AWS_KEY_ID'),
-                        aws_secret_access_key=os.getenv('AWS_SECRET_KEY'))
+                        aws_access_key_id=os.getenv('KEY_ID'),
+                        aws_secret_access_key=os.getenv('SECRET_KEY'))
 IDs = set()
 def get_restaurant(cuisine, total_num = 1000):
     with YelpAPI(os.getenv('YELP_API_KEY')) as yelp_api:
