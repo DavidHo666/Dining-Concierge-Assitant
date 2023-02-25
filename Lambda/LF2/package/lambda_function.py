@@ -59,14 +59,14 @@ def find_res_opensearch(index, cuisine, num_restaurant=5):
         # "size": 5,
         "query": {
             "match": {
-                "cuisine": cuisine
+                "cuisine": cuisine.lower()
             }
         }
     }
     headers = {"Content-Type": "application/json"}
     r = requests.get(url, auth=awsauth, headers=headers, data=json.dumps(query))
     r = json.loads(r.text)
-    random_res = random.choices(r['hits']['hits'], k=5)
+    random_res = random.choices(r['hits']['hits'], k=num_restaurant)
     response = []
     for res in random_res:
         response.append(res['_source'])
