@@ -7,6 +7,7 @@ from requests_aws4auth import AWS4Auth
 import requests
 import logging
 import time
+import random
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -55,7 +56,7 @@ def find_res_opensearch(index, cuisine, num_restaurant=5):
     awsauth = get_awsauth(REGION, service)
     url = os.getenv('OS_HOST') + '/' + index + '/_search'
     query = {
-        "size": 5,
+        # "size": 5,
         "query": {
             "match": {
                 "cuisine": cuisine
@@ -65,8 +66,9 @@ def find_res_opensearch(index, cuisine, num_restaurant=5):
     headers = {"Content-Type": "application/json"}
     r = requests.get(url, auth=awsauth, headers=headers, data=json.dumps(query))
     r = json.loads(r.text)
+    random_res = random.choices(r['hits']['hits'], k=5)
     response = []
-    for res in r['hits']['hits']:
+    for res in random_res:
         response.append(res['_source'])
 
     # [{'restaurantID': 'axqp3pGJXnTLgq2QrPyDyQ', 'cuisine': 'japanese'}, {'restaurantID': 'kesYSgOJW5krU6L8n9qQ4Q', 'cuisine': 'japanese'}, {'restaurantID': '9QK3vhI04Q8ylqk49C3JcQ', 'cuisine': 'japanese'}, {'restaurantID': 'i8ejDDR4COtukAAA1Ls5fw', 'cuisine': 'japanese'}, {'restaurantID': 'ipAsHykRvgJzpx5hD8vTJw', 'cuisine': 'japanese'}]
