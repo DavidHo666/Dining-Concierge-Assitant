@@ -24,8 +24,8 @@ def get_slot(intent_request, slot_name):
     slots = get_slots(intent_request)
     if slots[slot_name]:
         values = slots[slot_name]['value']
-        if values['interpretedValue']:
-            return values['interpretedValue']
+        if values['resolvedValues']:
+            return values['resolvedValues'][0]
         else:
             return values["originalValue"]
     else:
@@ -127,37 +127,64 @@ def validate_dining_suggestions(location, cuisine, party_size, date, time, email
                                        'We do not have suggestions in {}, '
                                        'you can choose Manhattan or NYC'.format(location))
 
+
     cuisine_types = ['american', 'italian', 'french', 'spanish', 'chinese', 'mexican', 'japanese',
                      'korean', 'thai']
     if cuisine and cuisine.lower() not in cuisine_types:
         return build_validation_result(False,
                                        'cuisine',
-                                       'We do not have suggestions in {}, please try another one'.format(cuisine))
+                                       'We do not have suggestions in {}, '
+                                       'please try another one such as Japanese'.format(cuisine))
+
+
 
     if party_size:
+        if not party_size.isnumeric():
+            return build_validation_result(False,
+                                           'party_size',
+                                           'Party Size is invalid. Please input a valid number.')
+
         if party_size.isnumeric() and (int(party_size) < 1 or int(party_size) > 12):
             return build_validation_result(False,
                                            'party_size',
                                            'We can only give suggestions for a party with 1-12 people, please try again.')
+
+
 
     if date:
         if not isvalid_date(date):
             return build_validation_result(False,
                                            'date',
                                            'I did not understand that, you can try today or tomorrow')
-        elif datetime.datetime.strptime(date, '%Y-%m-%d').date() <= datetime.date.today():
+        elif datetime.datetime.strptime(date, '%Y-%m-%d').date() < datetime.date.today():
             return build_validation_result(False,
                                            'date',
-                                           'The date can not be earlier than today.')
+                                           'The date can not be earlier than today, please try again.')
+
 
     if time:
+        if not isvalid_date(date+' '+time):
+            return build_validation_result(False,
+                                           'time',
+                                           'I did not understand that, please input a valid time.')
+        if datetime.datetime.strptime(date+' '+time, '%Y-%m-%d %H:%M') < datetime.datetime.now():
+            return build_validation_result(False,
+                                           'time',
+                                           'The time can not be earlier than now, '
+                                           'please try again.')
+
         if len(time) != 5:
             return build_validation_result(False, 'time', None)
+
+
 
     if email:
         regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
         if not (re.fullmatch(regex, email)):
-            return build_validation_result(False, 'email', 'The email is invalid, please try again.')
+            return build_validation_result(False,
+                                           'email',
+                                           'The email is invalid, please try again.')
+
 
     return build_validation_result(True, None, None)
 
@@ -244,7 +271,7 @@ def dining_suggestions_intent(intent_request):
     fulfilled_intent = intent_request['sessionState']['intent']
     fulfilled_intent['state'] = 'Fulfilled'
     messages = [{'contentType': 'PlainText',
-               'content': 'You’re all set. Expect my suggestions to {} shortly!'.format(email)}]
+               'content': "You're all set. Expect my suggestions to {} shortly!".format(email)}]
     return close(session_attributes, fulfilled_intent, messages)
 
 
@@ -253,7 +280,7 @@ def thank_you_intent(intent_request):
     fulfilled_intent = intent_request['sessionState']['intent']
     fulfilled_intent['state'] = 'Fulfilled'
     messages = [{'contentType': 'PlainText',
-                'content': 'You’re welcome!'}]
+                'content': "You're welcome!"}]
     return close(session_attributes, fulfilled_intent, messages)
 
 """ --- Intents --- """
