@@ -51,7 +51,7 @@ def delete_sqs_message(receipt_handle):
     )
 
 # ref: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/search-example.html
-def find_res_opensearch(index, cuisine, num_restaurant=5):
+def find_res_opensearch(index, cuisine):
     service = 'es'
     awsauth = get_awsauth(REGION, service)
     url = os.getenv('OS_HOST') + '/' + index + '/_search'
@@ -66,9 +66,8 @@ def find_res_opensearch(index, cuisine, num_restaurant=5):
     headers = {"Content-Type": "application/json"}
     r = requests.get(url, auth=awsauth, headers=headers, data=json.dumps(query))
     r = json.loads(r.text)
-    random_res = random.choices(r['hits']['hits'], k=num_restaurant)
     response = []
-    for res in random_res:
+    for res in r['hits']['hits']:
         response.append(res['_source'])
 
     # [{'restaurantID': 'axqp3pGJXnTLgq2QrPyDyQ', 'cuisine': 'japanese'}, {'restaurantID': 'kesYSgOJW5krU6L8n9qQ4Q', 'cuisine': 'japanese'}, {'restaurantID': '9QK3vhI04Q8ylqk49C3JcQ', 'cuisine': 'japanese'}, {'restaurantID': 'i8ejDDR4COtukAAA1Ls5fw', 'cuisine': 'japanese'}, {'restaurantID': 'ipAsHykRvgJzpx5hD8vTJw', 'cuisine': 'japanese'}]
@@ -147,15 +146,26 @@ def lambda_handler(event, context):
         email = msg['MessageAttributes']['email']['StringValue']
 
         results = find_res_opensearch('restaurants',
-                                      cuisine,
-                                      5)
-
+                                      cuisine)
+        names = set()
         all_details = []
-        for res in results:
+        while len(all_details) < 5:
+            i = random.randint(0, len(results))
+            res = results[i]
             res_details = search_dynamoDB(res['restaurantID'])
             res_details = res_details['Item']
-            res_dict = {'name': res_details['name'], 'location': res_details['location']['display_address']}
-            all_details.append(res_dict)
+            if res_details['name'] not in names:
+                res_dict = {
+                    'name': res_details['name'],
+                    'location': res_details['location']['display_address']}
+                all_details.append(res_dict)
+                names.add(res_details['name'])
+
+        # for res in results:
+        #     res_details = search_dynamoDB(res['restaurantID'])
+        #     res_details = res_details['Item']
+        #     res_dict = {'name': res_details['name'], 'location': res_details['location']['display_address']}
+        #     all_details.append(res_dict)
 
         response_message = build_message(all_details, cuisine,party_size,date,time,location)
         send_email(email, response_message)
