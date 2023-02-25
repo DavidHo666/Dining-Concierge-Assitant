@@ -56,10 +56,11 @@ def find_res_opensearch(index, cuisine):
     awsauth = get_awsauth(REGION, service)
     url = os.getenv('OS_HOST') + '/' + index + '/_search'
     query = {
-        # "size": 5,
+        "size": 1000,
         "query": {
-            "match": {
-                "cuisine": cuisine.lower()
+            "query_string": {
+                "default_field": "cuisine",
+                "query": cuisine.lower()
             }
         }
     }
@@ -161,17 +162,11 @@ def lambda_handler(event, context):
                 all_details.append(res_dict)
                 names.add(res_details['name'])
 
-        # for res in results:
-        #     res_details = search_dynamoDB(res['restaurantID'])
-        #     res_details = res_details['Item']
-        #     res_dict = {'name': res_details['name'], 'location': res_details['location']['display_address']}
-        #     all_details.append(res_dict)
 
         response_message = build_message(all_details, cuisine,party_size,date,time,location)
         send_email(email, response_message)
 
         delete_sqs_message(msg['ReceiptHandle'])
-
 
 
 # if __name__ == '__main__':
