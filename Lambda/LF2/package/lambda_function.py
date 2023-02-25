@@ -6,15 +6,17 @@ from opensearchpy import OpenSearch, RequestsHttpConnection
 from requests_aws4auth import AWS4Auth
 import requests
 import logging
+import time
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 REGION = 'us-east-1'
 
-sqs = boto3.client('sqs', region_name = 'us-east-1')
-dynamodb = boto3.resource('dynamodb', region_name="us-east-1")
+sqs = boto3.client('sqs', region_name = REGION)
+dynamodb = boto3.resource('dynamodb', region_name=REGION)
 table = dynamodb.Table('yelp-restaurants')
+ses = boto3.client("ses", region_name=REGION)
 
 
 # ref: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/sqs-example-sending-receiving-msgs.html
@@ -23,7 +25,7 @@ def receive_sqs_message():
         QueueUrl=os.getenv('SQS_URL'),
         AttributeNames=['All'],
         MessageAttributeNames=[
-            'cuisine', 'date', 'location', 'party_size', 'phone_number', 'time'
+            'cuisine', 'date', 'location', 'party_size', 'email', 'time'
         ],
         MaxNumberOfMessages=10,
         WaitTimeSeconds=10
@@ -39,15 +41,11 @@ def delete_sqs_message(receipt_handle):
 
 # ref: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/search-example.html
 def find_res_opensearch(index, cuisine, num_restaurant=5):
-    region = 'us-east-1'
     service = 'es'
-    # credentials = boto3.Session(aws_access_key_id='AKIAT4SNU5OBHEBI36UH',
-    #                       aws_secret_access_key="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",
-    #                       region_name="us-east-1").get_credentials()
-    awsauth = get_awsauth(region, service)
+    awsauth = get_awsauth(REGION, service)
     url = os.getenv('OS_HOST') + '/' + index + '/_search'
     query = {
-        "size": num_restaurant,
+        "size": 5,
         "query": {
             "match": {
                 "cuisine": cuisine
@@ -56,7 +54,6 @@ def find_res_opensearch(index, cuisine, num_restaurant=5):
     }
     headers = {"Content-Type": "application/json"}
     r = requests.get(url, auth=awsauth, headers=headers, data=json.dumps(query))
-
     r = json.loads(r.text)
     response = []
     for res in r['hits']['hits']:
@@ -78,16 +75,82 @@ def get_awsauth(region, service):
                     service,
                     session_token=cred.token)
 
+# https://www.learnaws.org/2020/12/18/aws-ses-boto3-guide/
+def verify_email_identity(email):
+    response = ses.verify_email_identity(
+        EmailAddress=email
+    )
+    print(response)
+
+def send_email(email, message):
+    if email not in ses.list_verified_email_addresses()['VerifiedEmailAddresses']:
+        verify_email_identity(email)
+        while email not in ses.list_verified_email_addresses()['VerifiedEmailAddresses']:
+            time.sleep(10)
+
+    ses.send_email(
+        Destination={
+            "ToAddresses": [
+                email,
+            ],
+        },
+        Message={
+            "Subject": {
+                "Charset": "UTF-8",
+                "Data": "Restaurant suggestions",
+            },
+            "Body": {
+                "Text": {
+                    "Charset": "UTF-8",
+                    "Data": message,
+                }
+            },
+        },
+        Source='dh3027@columbia.edu'
+    )
+
+def build_message(all_details, cuisine, party_size, date, time, location):
+    message = 'Welcome to use Dining Concierge Assistant!\n'
+    message += 'Your requirements are: \n'
+    message += f"Cuisine: {cuisine}\n"
+    message += f"Location: {location}\n"
+    message += f"Party Size: {party_size}\n"
+    message += f"Date: {date}\n"
+    message += f"Time: {time}\n"
+    message += '\n'
+    message += f"We have {len(all_details)} restaurant suggestions for you: \n"
+    for i, res in enumerate(all_details):
+        message += f"({i}) {res['name']}: {' '.join(res['location'])}\n"
+    return message
+
 
 def lambda_handler(event, context):
     messages = receive_sqs_message()
-    for mesg in messages:
+    for msg in messages:
+        cuisine = msg['MessageAttributes']['cuisine']['StringValue']
+        party_size = msg['MessageAttributes']['party_size']['StringValue']
+        date = msg['MessageAttributes']['date']['StringValue']
+        time = msg['MessageAttributes']['time']['StringValue']
+        location = msg['MessageAttributes']['location']['StringValue']
+        email = msg['MessageAttributes']['email']['StringValue']
+
         results = find_res_opensearch('restaurants',
-                                      mesg['MessageAttributes']['cuisine'],
+                                      cuisine,
                                       5)
+
+        all_details = []
         for res in results:
-            details = search_dynamoDB(res['restaurantID'])
-        delete_sqs_message(mesg['ReceiptHandle'])
+            res_details = search_dynamoDB(res['restaurantID'])
+            res_details = res_details['Item']
+            res_dict = {'name': res_details['name'], 'location': res_details['location']['display_address']}
+            all_details.append(res_dict)
 
-    return results
+        response_message = build_message(all_details, cuisine,party_size,date,time,location)
+        send_email(email, response_message)
 
+        delete_sqs_message(msg['ReceiptHandle'])
+
+
+
+if __name__ == '__main__':
+    lambda_handler(None, None)
