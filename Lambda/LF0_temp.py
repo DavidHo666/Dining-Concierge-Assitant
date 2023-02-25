@@ -4,8 +4,18 @@ import json
 # Define the client to interact with Lex
 client = boto3.client('lexv2-runtime')
 
-def lambda_handler(event, context):
+def insert_data(data_list, db=None, table='last_search'):
+    if not db:
+        db = boto3.resource('dynamodb')
+    table = db.Table(table)
+    # overwrite if the same index is provided
+    for data in data_list:
+        response = table.put_item(Item=data)
+    print('@insert_data: response', response)
+    return response
 
+def lambda_handler(event, context):
+    print(event)
     # msg_from_user = event['messages'][0]["unstructured"]["text"]
 
     # change this to the message that user submits on 
@@ -37,15 +47,42 @@ def lambda_handler(event, context):
             response_from_lex +=  message['content']+ ' '
             
         print(f"Message from Chatbot: {response_from_lex}")
-        print(f"Chatbot's sessionIntent: {session_intent['name']}")
-
-        if session_intent['slots'] != None:
+        # print(f"Chatbot's sessionIntent: {session_intent['name']}")
+        # print(session_intent['slots'])
+        
+        # extract recognized cuisine category and location from lex
+        category = ''
+        location = ''
+        request_id = ''
+        request_date = ''
+        flag = 0
+        if session_intent['slots'] != {} and session_intent['slots']['party_size'] == None:
+            if session_intent['slots']['location'] != None:
+                location = session_intent['slots']['location']['value']['resolvedValues'][0]
+                # print(location)
             if session_intent['slots']['cuisine'] != None:
                 category = session_intent['slots']['cuisine']['value']['resolvedValues'][0]
-                print(category)
-            if session_intent['slots']['cuisine'] != None:
-                location = session_intent['slots']['location']['value']['resolvedValues'][0]
-                print(location)
+                request_id = response['ResponseMetadata']['RequestId']
+                request_date = response['ResponseMetadata']['HTTPHeaders']['date']
+                flag = 1
+                # print(category)
+            
+        # store Last search
+        if flag == 1:
+            print("Ready to store last search info")
+
+            print(location)
+            print(category)
+            print(request_id)
+            print(request_date)
+            
+            last_search = [{'request_id': request_id,
+                'request_date': request_date,
+                'location': location,
+                'category': category
+                }]
+            insert_data(last_search)
+            
         
         #ref https://docs.aws.amazon.com/lexv2/latest/APIReference/API_runtime_RecognizeText.html#API_runtime_RecognizeText_ResponseSyntax
         print(response)
