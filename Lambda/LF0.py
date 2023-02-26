@@ -6,6 +6,9 @@ from botocore.exceptions import ClientError
 # Define the client to interact with Lex
 client = boto3.client('lexv2-runtime')
 
+# Define the client to interact with ASW Lambda
+client_LF3 = boto3.client('lambda')
+
 def lookup_data(key, db=None, table='last_search'):
     if not db:
         db = boto3.resource('dynamodb')
@@ -87,12 +90,32 @@ def lambda_handler(event, context):
                 tuples = lookup_data({'user_email': user_email})
                 old_location = ""
                 old_category = ""
+                response_from_LF3 = ""
                 if(tuples): 
                     old_location = tuples["location"]
                     old_category = tuples["category"]
                     print("old user!")
                     print(old_location)
                     print(old_category)
+                    # invoke LF3 here
+                    #ref https://www.sqlshack.com/calling-an-aws-lambda-function-from-another-lambda-function/
+                    input_event = {
+                        "user_email": user_email,
+                        "old_location": old_location,
+                        "old_category": old_category
+                    }
+                    
+                    #
+                    response = client_LF3.invoke(
+                        FunctionName = 'arn:aws:lambda:us-east-1:267524565890:function:LF3',
+                        InvocationType = 'RequestResponse',
+                        Payload = json.dumps(input_event)
+                    )
+                    
+                    response_from_LF3 = json.load(response['Payload'])["body"][1:-1]
+                    
+                    print(response_from_LF3)
+                    response_from_lex = response_from_LF3 + ' ' + response_from_lex
                     
                 else:
                     print("new user!")
