@@ -1,8 +1,27 @@
 import boto3
 import json
+from botocore.exceptions import ClientError
+# from boto3.dynamodb.conditions import Key
 
 # Define the client to interact with Lex
 client = boto3.client('lexv2-runtime')
+
+def lookup_data(key, db=None, table='last_search'):
+    if not db:
+        db = boto3.resource('dynamodb')
+    table = db.Table(table)
+    try:
+        response = table.get_item(Key=key)
+    except ClientError as e:
+        print('Error', e.response['Error']['Message'])
+    else:
+        # print(response)
+        if 'Item' in response.keys():
+            return response['Item']
+        else:
+            return ""
+        
+
 
 def insert_data(data_list, db=None, table='last_search'):
     if not db:
@@ -13,6 +32,7 @@ def insert_data(data_list, db=None, table='last_search'):
         response = table.put_item(Item=data)
     print('@insert_data: response', response)
     return response
+
 
 def lambda_handler(event, context):
     print(event)
@@ -37,6 +57,7 @@ def lambda_handler(event, context):
             sessionId='test_session',
             text=msg_from_user)
     
+    
     msg_from_lex = response.get('messages', [])
     session_intent = response.get('interpretations',[])[0]['intent']
     
@@ -50,7 +71,7 @@ def lambda_handler(event, context):
         # print(f"Chatbot's sessionIntent: {session_intent['name']}")
         # print(session_intent['slots'])
         
-        # extract recognized cuisine category and location from lex
+        # extract recognized email, cuisine category and location from lex
         category = ''
         location = ''
         request_id = ''
@@ -60,13 +81,27 @@ def lambda_handler(event, context):
         if session_intent['slots'] != {} and session_intent['slots']['party_size'] == None:
             if session_intent['slots']['email'] != None:
                 user_email = session_intent['slots']['email']['value']['resolvedValues'][0]
-                
+                # check whether this is a new user #####################################################################################
+                print(user_email)
+        
+                tuples = lookup_data({'user_email': user_email})
+                old_location = ""
+                old_category = ""
+                if(tuples): 
+                    old_location = tuples["location"]
+                    old_category = tuples["category"]
+                    print("old user!")
+                    print(old_location)
+                    print(old_category)
+                    
+                else:
+                    print("new user!")
+                    
             if session_intent['slots']['location'] != None:
                 location = session_intent['slots']['location']['value']['resolvedValues'][0]
                 
             if session_intent['slots']['cuisine'] != None:
                 category = session_intent['slots']['cuisine']['value']['resolvedValues'][0]
-                request_id = response['ResponseMetadata']['RequestId']
                 request_date = response['ResponseMetadata']['HTTPHeaders']['date']
                 flag = 1
             
@@ -79,7 +114,7 @@ def lambda_handler(event, context):
             print(request_id)
             print(request_date)
             print(user_email)
-            last_search = [{'request_id': request_id,
+            last_search = [{
                 'request_date': request_date,
                 'location': location,
                 'category': category,
