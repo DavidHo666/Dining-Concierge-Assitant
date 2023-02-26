@@ -70,7 +70,7 @@ def lambda_handler(event, context):
         for message in msg_from_lex:
             response_from_lex +=  message['content'] + ' '
             
-        print(f"Message from Chatbot: {response_from_lex}")
+        print(response_from_lex)
         # print(f"Chatbot's sessionIntent: {session_intent['name']}")
         # print(session_intent['slots'])
         
@@ -81,11 +81,16 @@ def lambda_handler(event, context):
         request_date = ''
         user_email = ''
         flag = 0
+        trigger_response = "What city or city area are you looking to dine in? "
+        print(trigger_response)
+        print(response_from_lex == trigger_response)
+        
         if session_intent['slots'] != {} and session_intent['slots']['party_size'] == None:
             if session_intent['slots']['email'] != None:
                 user_email = session_intent['slots']['email']['value']['resolvedValues'][0]
                 
-            if session_intent['slots']['email'] != None and session_intent['slots']['location'] == None:
+            if session_intent['slots']['email'] != None and session_intent['slots']['location'] == None and response_from_lex == trigger_response:
+                
                 # check whether this is a new user 
                 print(user_email)
         
