@@ -68,7 +68,7 @@ def lambda_handler(event, context):
         
         response_from_lex=''
         for message in msg_from_lex:
-            response_from_lex +=  message['content']+ ' '
+            response_from_lex +=  message['content'] + ' '
             
         print(f"Message from Chatbot: {response_from_lex}")
         # print(f"Chatbot's sessionIntent: {session_intent['name']}")
@@ -84,7 +84,9 @@ def lambda_handler(event, context):
         if session_intent['slots'] != {} and session_intent['slots']['party_size'] == None:
             if session_intent['slots']['email'] != None:
                 user_email = session_intent['slots']['email']['value']['resolvedValues'][0]
-                # check whether this is a new user #####################################################################################
+                
+            if session_intent['slots']['email'] != None and session_intent['slots']['location'] == None:
+                # check whether this is a new user 
                 print(user_email)
         
                 tuples = lookup_data({'user_email': user_email})
@@ -105,16 +107,38 @@ def lambda_handler(event, context):
                         "old_category": old_category
                     }
                     
-                    #
-                    response = client_LF3.invoke(
+                    # get response from LF3
+                    response_LF = client_LF3.invoke(
                         FunctionName = 'arn:aws:lambda:us-east-1:267524565890:function:LF3',
                         InvocationType = 'RequestResponse',
                         Payload = json.dumps(input_event)
                     )
                     
-                    response_from_LF3 = json.load(response['Payload'])["body"][1:-1]
+                    response_from_LF3 = json.load(response_LF['Payload'])["body"][1:-1]
                     
                     print(response_from_LF3)
+                    
+                    # send email again to get correct functionality ############################
+                    
+                    response = client.recognize_text(
+                    botId='XYWRSPCNFB', # MODIFY HERE
+                    # botAliasId='MAUQZ0D8KP',  # version 2
+                    botAliasId='TSTALIASID', # draft version
+                    localeId='en_US',
+                    sessionId='test_session',
+                    text=" I need some restaurant suggestions.")
+                    
+                    response = client.recognize_text(
+                    botId='XYWRSPCNFB', # MODIFY HERE
+                    # botAliasId='MAUQZ0D8KP',  # version 2
+                    botAliasId='TSTALIASID', # draft version
+                    localeId='en_US',
+                    sessionId='test_session',
+                    text=user_email)
+                    
+                    msg_from_lex = response.get('messages', [])
+                    session_intent = response.get('interpretations',[])[0]['intent']
+    
                     response_from_lex = response_from_LF3 + ' ' + response_from_lex
                     
                 else:
@@ -134,7 +158,6 @@ def lambda_handler(event, context):
 
             print(location)
             print(category)
-            print(request_id)
             print(request_date)
             print(user_email)
             last_search = [{
