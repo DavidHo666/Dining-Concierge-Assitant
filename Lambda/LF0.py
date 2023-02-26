@@ -145,7 +145,9 @@ def lambda_handler(event, context):
                     print("new user!")
                     
             if session_intent['slots']['location'] != None:
-                location = session_intent['slots']['location']['value']['resolvedValues'][0]
+                # print("MARK")
+                # print(session_intent['slots']['location'])
+                location = session_intent['slots']['location']['value']['interpretedValue']
                 
             if session_intent['slots']['cuisine'] != None:
                 category = session_intent['slots']['cuisine']['value']['resolvedValues'][0]
