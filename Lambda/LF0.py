@@ -57,19 +57,18 @@ def lambda_handler(event, context):
         request_date = ''
         user_email = ''
         flag = 0
-        if session_intent['slots'] != {}:
-            if session_intent['slots']['location'] != None:
-                location = session_intent['slots']['location']['value']['resolvedValues'][0]
-                # print(location)
-            if session_intent['slots']['cuisine'] != None:
-                category = session_intent['slots']['cuisine']['value']['resolvedValues'][0]
-                
+        if session_intent['slots'] != {} and session_intent['slots']['party_size'] == None:
             if session_intent['slots']['email'] != None:
                 user_email = session_intent['slots']['email']['value']['resolvedValues'][0]
+                
+            if session_intent['slots']['location'] != None:
+                location = session_intent['slots']['location']['value']['resolvedValues'][0]
+                
+            if session_intent['slots']['cuisine'] != None:
+                category = session_intent['slots']['cuisine']['value']['resolvedValues'][0]
                 request_id = response['ResponseMetadata']['RequestId']
                 request_date = response['ResponseMetadata']['HTTPHeaders']['date']
                 flag = 1
-                # print(category)
             
         # store search info into DynamoDB
         if flag == 1:
